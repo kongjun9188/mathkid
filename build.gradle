@@ -1,0 +1,65 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.hefei.mathkid'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.hefei.mathkid"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    signingConfigs {
+        release {
+            // 签名文件在 CI 构建时由 keytool 自动生成；
+            // 本地手动构建时若已放置 keystore/mathkid.jks 也会自动复用。
+            def ksFile = file("keystore/mathkid.jks")
+            storeFile ksFile
+            storePassword "mathkid123"
+            keyAlias "mathkid"
+            keyPassword "mathkid123"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packagingOptions {
+        resources {
+            excludes += ['META-INF/*.kotlin_module']
+        }
+    }
+
+    // 构建开始前校验签名文件存在，缺了就立刻报错，
+    // 避免静默产出一个装不上手机的未签名 APK
+    tasks.configureEach { task ->
+        if (task.name.startsWith('assemble') || task.name.startsWith('bundle')) {
+            task.doFirst {
+                def ks = file("keystore/mathkid.jks")
+                if (!ks.exists()) {
+                    throw new GradleException(
+                        "缺少签名文件: ${ks.absolutePath}\n" +
+                        "请先执行 keytool 生成签名（CI 流程会自动完成），\n" +
+                        "或在本地运行: keytool -genkeypair -keystore app/keystore/mathkid.jks " +
+                        "-storepass mathkid123 -keypass mathkid123 -alias mathkid " +
+                        "-keyalg RSA -keysize 2048 -validity 10950 -dname \"CN=MathKid\""
+                    )
+                }
+            }
+        }
+    }
+}
