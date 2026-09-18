@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>数学小闯关</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent;
+      -webkit-user-select:none; user-select:none; }
+  html,body { height:100%; overflow:hidden; }
+  body {
+    font-family: "PingFang SC","Microsoft YaHei","Heiti SC",sans-serif;
+    background: linear-gradient(170deg,#FFF6E5 0%,#FFE6C7 45%,#FFD9E8 100%);
+    color:#4A3620;
+  }
+  #app { height:100%; display:flex; flex-direction:column; padding:12px 14px calc(12px + env(safe-area-inset-bottom)); }
+
+  /* 顶部状态栏 */
+  .hud { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+  .chip {
+    background:#fff; border-radius:999px; padding:6px 14px; font-weight:700; font-size:15px;
+    box-shadow:0 2px 0 #E8C89A, 0 4px 10px rgba(180,130,60,.16);
+    display:flex; align-items:center; gap:5px; white-space:nowrap;
+  }
+  .chip.star { color:#F5A623; }
+  .chip.combo { color:#FF5C8A; }
+  .spacer { flex:1; }
+  .btn-round {
+    width:38px; height:38px; border-radius:50%; border:none; background:#fff; font-size:19px;
+    box-shadow:0 2px 0 #E8C89A, 0 4px 10px rgba(180,130,60,.16); cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .btn-round:active { transform:translateY(2px); box-shadow:0 0 0 #E8C89A; }
+
+  /* 主体区域 */
+  .stage { flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:14px; overflow:hidden; }
+
+  /* 进度条 */
+  .progress-wrap { width:100%; max-width:420px; height:14px; background:#fff; border-radius:999px;
+    box-shadow:inset 0 2px 4px rgba(180,130,60,.2); overflow:hidden; flex-shrink:0; }
+  .progress-bar { height:100%; width:0%; border-radius:999px;
+    background:linear-gradient(90deg,#7ED957,#39C46E); transition:width .35s ease; }
+
+  /* 题目卡片 */
+  .quiz {
+    width:100%; max-width:420px; background:#fff; border-radius:28px; padding:22px 18px 26px;
+    box-shadow:0 6px 0 #E8C89A, 0 14px 30px rgba(180,130,60,.22);
+    text-align:center; animation:pop .3s cubic-bezier(.2,1.4,.5,1);
+  }
+  @keyframes pop { from{transform:scale(.9);opacity:0} to{transform:scale(1);opacity:1} }
+
+  .q-text { font-size:26px; font-weight:800; color:#8A6A3D; margin-bottom:14px; letter-spacing:.5px; }
+  .stars-row { font-size:20px; min-height:26px; margin-bottom:8px; letter-spacing:2px; }
+  .expr { font-size:52px; font-weight:900; color:#3D2E17; letter-spacing:2px; line-height:1.2; }
+  .expr .ans-box {
+    display:inline-block; min-width:78px; border-bottom:6px solid #FFC93B;
+    color:#FF8A3D; vertical-align:baseline;
+  }
+
+  /* 选项 */
+  .options { width:100%; max-width:420px; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .opt {
+    position:relative; border:none; border-radius:22px; padding:20px 8px; font-size:34px; font-weight:900;
+    color:#5A421F; background:#fff; cursor:pointer;
+    box-shadow:0 5px 0 #E8C89A, 0 10px 20px rgba(180,130,60,.18);
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .opt:active { transform:translateY(4px); box-shadow:0 1px 0 #E8C89A; }
+  .opt.correct { background:linear-gradient(160deg,#8FE388,#39C46E); color:#fff;
+    box-shadow:0 5px 0 #2A9E55; animation:jump .42s ease; }
+  .opt.wrong { background:linear-gradient(160deg,#FFB3B3,#FF7A7A); color:#fff;
+    box-shadow:0 5px 0 #D95C5C; animation:shake .4s ease; }
+  .opt.dim { opacity:.42; }
+  @keyframes jump { 0%{transform:translateY(0)} 40%{transform:translateY(-14px) scale(1.06)} 100%{transform:translateY(0)} }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-9px)} 40%{transform:translateX(9px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)} }
+
+  /* 数字键盘（填空题用） */
+  .keypad { width:100%; max-width:420px; display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .key {
+    border:none; border-radius:18px; padding:16px 0; font-size:28px; font-weight:900; color:#5A421F;
+    background:#fff; cursor:pointer; box-shadow:0 4px 0 #E8C89A;
+  }
+  .key:active { transform:translateY(3px); box-shadow:0 1px 0 #E8C89A; }
+  .key.fn { background:#FFE9C9; font-size:22px; }
+
+  /* 主页 */
+  .home { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; overflow-y:auto; padding:6px 0; }
+  .logo { font-size:40px; font-weight:900; color:#FF8A3D; text-shadow:0 3px 0 #FFE0B0; letter-spacing:2px; }
+  .logo-sub { font-size:15px; color:#A8865C; font-weight:600; margin-top:-8px; }
+  .pet-card { width:100%; max-width:420px; background:#fff; border-radius:26px; padding:16px;
+    box-shadow:0 6px 0 #E8C89A, 0 12px 26px rgba(180,130,60,.2); text-align:center; }
+  .pet-stage { font-size:64px; line-height:1.1; animation:breathe 2.2s ease-in-out infinite; }
+  @keyframes breathe { 0%,100%{transform:scale(1)} 50%{transform:scale(1.09)} }
+  .pet-name { font-weight:800; font-size:17px; margin-top:2px; }
+  .pet-bar-wrap { height:12px; background:#FFEFD6; border-radius:999px; margin-top:9px; overflow:hidden; }
+  .pet-bar { height:100%; width:0%; background:linear-gradient(90deg,#FFC93B,#FF8A3D); transition:width .4s ease; }
+  .pet-tip { font-size:12.5px; color:#A8865C; margin-top:7px; font-weight:600; }
+
+  .mode-list { width:100%; max-width:420px; display:flex; flex-direction:column; gap:12px; }
+  .mode {
+    display:flex; align-items:center; gap:14px; border:none; border-radius:22px; padding:16px 18px;
+    background:#fff; cursor:pointer; text-align:left;
+    box-shadow:0 5px 0 #E8C89A, 0 10px 22px rgba(180,130,60,.18);
+    transition:transform .12s ease;
+  }
+  .mode:active { transform:translateY(4px); box-shadow:0 1px 0 #E8C89A; }
+  .mode .ico { font-size:30px; flex-shrink:0; }
+  .mode .txt { flex:1; }
+  .mode .t1 { font-size:18px; font-weight:800; color:#4A3620; }
+  .mode .t2 { font-size:12.5px; color:#A8865C; font-weight:600; margin-top:2px; }
+  .mode .arrow { font-size:20px; color:#FFC93B; font-weight:900; }
+  .mode.locked { opacity:.55; }
+  .mode.locked .arrow { content:""; }
+
+  /* 结算 */
+  .result { text-align:center; }
+  .result .big { font-size:56px; font-weight:900; color:#FF8A3D; }
+  .result .lbl { font-size:17px; color:#8A6A3D; font-weight:700; margin-bottom:6px; }
+  .result .got-stars { font-size:44px; margin:12px 0 4px; letter-spacing:6px; }
+  .result .msg { font-size:16px; color:#A8865C; font-weight:700; margin-bottom:18px; }
+  .result .newpet { font-size:15px; font-weight:800; color:#FF5C8A; margin-bottom:12px; }
+
+  .btn-main {
+    border:none; border-radius:22px; padding:16px 34px; font-size:20px; font-weight:900; color:#fff;
+    background:linear-gradient(160deg,#FFB347,#FF8A3D); cursor:pointer;
+    box-shadow:0 5px 0 #D96F28, 0 10px 22px rgba(217,111,40,.3);
+  }
+  .btn-main:active { transform:translateY(4px); box-shadow:0 1px 0 #D96F28; }
+  .btn-ghost {
+    border:none; border-radius:22px; padding:14px 28px; font-size:17px; font-weight:800; color:#8A6A3D;
+    background:#fff; cursor:pointer; box-shadow:0 5px 0 #E8C89A;
+  }
+  .btn-ghost:active { transform:translateY(4px); box-shadow:0 1px 0 #E8C89A; }
+  .btn-row { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+
+  /* 飘字与彩带 */
+  .float-txt { position:fixed; font-size:32px; font-weight:900; pointer-events:none;
+    animation:floatUp .9s ease-out forwards; z-index:999; }
+  @keyframes floatUp { 0%{opacity:1;transform:translate(-50%,0) scale(.7)}
+    30%{transform:translate(-50%,-30px) scale(1.15)} 100%{opacity:0;transform:translate(-50%,-90px) scale(1)} }
+  .confetti { position:fixed; width:11px; height:16px; border-radius:2px; pointer-events:none;
+    animation:fall 1.7s linear forwards; z-index:998; }
+  @keyframes fall { 0%{opacity:1;transform:translateY(0) rotate(0)}
+    100%{opacity:0;transform:translateY(105vh) rotate(720deg)} }
+
+  .hidden { display:none !important; }
+
+  /* 小屏幕适配 */
+  @media (max-height:640px) {
+    .expr { font-size:42px; }
+    .opt { font-size:28px; padding:16px 8px; }
+    .pet-stage { font-size:50px; }
+    .logo { font-size:32px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="hud" id="hud"></div>
+  <div class="stage" id="stage"></div>
+</div>
+
+<script>
+/* =========================================================
+   数学小闯关 —— 安徽合肥小学一年级数学课堂随机练习
+   题库：20 以内加减法（含进位退位），配 10 以内热身
+   玩法：闯关 + 星星 + 计时挑战 + 小动物收集 + 语音音效鼓励
+   ========================================================= */
+
+// ---------- 关卡配置 ----------
+// type: add10/sub10 十以内热身 | add20 20以内进位加 | sub20 20以内退位减 | mix20 混合 | missing 填空
+const LEVELS = [
+  { id:1,  name:'数字热身',   icon:'🌱', type:'add10',   total:8,  time:0,  desc:'10 以内加法，先热热身' },
+  { id:2,  name:'小棒数一数', icon:'🥢', type:'sub10',   total:8,  time:0,  desc:'10 以内减法，别数错啦' },
+  { id:3,  name:'凑十高手',   icon:'🍎', type:'add20',   total:10, time:0,  desc:'进位加法，想想凑十法' },
+  { id:4,  name:'破十魔法',   icon:'🪄', type:'sub20',   total:10, time:0,  desc:'退位减法，用破十法试试' },
+  { id:5,  name:'加减混合',   icon:'🎪', type:'mix20',   total:10, time:0,  desc:'加法减法一起来' },
+  { id:6,  name:'闪电挑战',   icon:'⚡', type:'mix20',   total:12, time:60, desc:'60 秒内能做对几道？' },
+  { id:7,  name:'填一填',     icon:'🔍', type:'missing', total:8,  time:0,  desc:'括号里该填几呢' },
+  { id:8,  name:'数学大魔王', icon:'👑', type:'mix20',   total:15, time:90, desc:'终极挑战，你能全对吗' },
+];
+
+// ---------- 小动物收集 ----------
+const PETS = [
+  { id:'egg',    emoji:'🥚', name:'蛋蛋',     need:0  },
+  { id:'chick',  emoji:'🐣', name:'小鸡球球', need:6  },
+  { id:'rabbit', emoji:'🐰', name:'跳跳兔',   need:16 },
+  { id:'cat',    emoji:'🐱', name:'喵喵',     need:30 },
+  { id:'panda',  emoji:'🐼', name:'滚滚',     need:48 },
+  { id:'fox',    emoji:'🦊', name:'小狐狸',   need:70 },
+  { id:'lion',   emoji:'🦁', name:'狮王',     need:96 },
+  { id:'unicorn',emoji:'🦄', name:'独角兽',   need:130 },
+  { id:'dragon', emoji:'🐲', name:'神龙',     need:170 },
+];
+
+// ---------- 本地存档 ----------
+const SAVE_KEY = 'mathkid_save_v1';
+let save = loadSave();
+
+function loadSave() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (s && typeof s === 'object') return Object.assign(defaultSave(), s);
+    }
+  } catch (e) {}
+  return defaultSave();
+}
+function defaultSave() {
+  return { stars:{}, totalStars:0, petIdx:0, petFed:0, best:{}, sound:true };
+}
+function persist() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
+}
+
+// ---------- 音效（Web Audio 合成，无需音频文件） ----------
+let audioCtx = null;
+function ac() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+  }
+  if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume(); }
+  return audioCtx;
+}
+function tone(freq, start, dur, type, vol) {
+  const c = ac(); if (!c) return;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type || 'sine'; o.frequency.value = freq;
+  o.connect(g); g.connect(c.destination);
+  const t = c.currentTime + start;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vol || .18, t + .015);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.start(t); o.stop(t + dur + .02);
+}
+function sfxCorrect() {
+  if (!save.sound) return;
+  tone(784, 0, .13, 'triangle', .2);
+  tone(988, .09, .13, 'triangle', .2);
+  tone(1319, .18, .24, 'triangle', .18);
+}
+function sfxWrong() {
+  if (!save.sound) return;
+  tone(320, 0, .16, 'sine', .14);
+  tone(250, .14, .24, 'sine', .13);
+}
+function sfxTap() {
+  if (!save.sound) return;
+  tone(880, 0, .06, 'sine', .09);
+}
+function sfxWin() {
+  if (!save.sound) return;
+  [523,659,784,1047,1319].forEach((f,i)=>tone(f, i*.11, .3, 'triangle', .19));
+}
+function sfxPet() {
+  if (!save.sound) return;
+  [659,880,1047,1319,1568].forEach((f,i)=>tone(f, i*.08, .28, 'triangle', .2));
+}
+
+// ---------- 语音鼓励（系统 TTS，中文） ----------
+const PRAISE = ['太棒了','真厉害','做得好','你真聪明','完全正确','好厉害呀','对了对了','你真棒'];
+const ENCOURAGE = ['没关系，再想想','差一点哦','别着急，慢慢来','再试一次吧'];
+function speak(text) {
+  if (!save.sound) return;
+  if (!('speechSynthesis' in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'zh-CN'; u.rate = 1.15; u.pitch = 1.35; u.volume = 1;
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+}
+function praise() { speak(PRAISE[Math.floor(Math.random()*PRAISE.length)]); }
+function encourage() { speak(ENCOURAGE[Math.floor(Math.random()*ENCOURAGE.length)]); }
+
+// ---------- 出题引擎 ----------
+const rnd = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
+
+function makeQuestion(type) {
+  let a, b, ans, text, op, isMissing = false, missPos = 0;
+
+  switch (type) {
+    case 'add10':
+      a = rnd(1, 9); b = rnd(1, 10 - a); ans = a + b; break;
+    case 'sub10':
+      // 放宽范围，避免大量重复出现「2 - 1」这类过于简单的题
+      a = rnd(3, 10); b = rnd(1, a - 1); ans = a - b; break;
+    case 'add20': { // 进位加法：个位相加 > 10
+      do { a = rnd(5, 9); b = rnd(2, 9); } while (a + b <= 10);
+      ans = a + b; break;
+    }
+    case 'sub20': { // 退位减法：被减数个位 < 减数
+      do { a = rnd(11, 18); b = rnd(2, 9); } while (a % 10 >= b || a - b <= 0);
+      ans = a - b; break;
+    }
+    case 'missing': {
+      // 形如 ★ + ? = 结果  或  ? - ★ = 结果
+      const mode = rnd(1, 4);
+      if (mode === 1) { a = rnd(1, 9); b = rnd(1, 10 - a); ans = b; text = `${a} + ( ) = ${a+b}`; }
+      else if (mode === 2) { a = rnd(11, 18); b = rnd(2, 9); if (a%10 < b) { b = a%10 - 1; } if (b<1) b=1;
+        ans = b; text = `${a} − ( ) = ${a-b}`; }
+      else if (mode === 3) { a = rnd(5, 9); b = rnd(2, 9); if (a+b<=10) b = 11-a;
+        ans = a; text = `( ) + ${b} = ${a+b}`; }
+      else { a = rnd(11, 18); b = rnd(2, 9); if (a%10 >= b) b = a%10 + 1; if (b>9) b=9;
+        ans = a; text = `( ) − ${b} = ${a-b}`; }
+      isMissing = true;
+      break;
+    }
+    default: { // mix20
+      if (Math.random() < .5) return makeQuestion('add20');
+      return makeQuestion('sub20');
+    }
+  }
+
+  if (!isMissing) {
+    op = (type === 'sub10' || type === 'sub20') ? '−' : '+';
+    text = `${a} ${op} ${b} = ?`;
+    // 混合同样可能是减法：根据实际运算符修正
+    if (type === 'mix20') text = `${a} ${op} ${b} = ?`;
+  }
+  return { text, ans, isMissing };
+}
+
+// 生成不重复的选项
+function makeOptions(ans) {
+  const set = new Set([ans]);
+  const pool = [];
+  for (let d = 1; d <= 4; d++) { pool.push(ans + d); if (ans - d > 0) pool.push(ans - d); }
+  pool.push(ans + 10, ans - 10);
+  const valid = pool.filter(v => v > 0 && v <= 100 && v !== ans);
+  valid.sort(() => Math.random() - .5);
+  for (const v of valid) {
+    if (set.size >= 4) break;
+    set.add(v);
+  }
+  while (set.size < 4) set.add(rnd(1, 20));
+  return [...set].sort(() => Math.random() - .5);
+}
+
+// ---------- 全局状态 ----------
+let state = null;
+
+// ---------- 界面渲染 ----------
+const hudEl = document.getElementById('hud');
+const stageEl = document.getElementById('stage');
+
+function renderHUD(mode) {
+  if (mode === 'home') {
+    hudEl.innerHTML = `
+      <div class="chip star">⭐ ${save.totalStars}</div>
+      <div class="chip">${PETS[save.petIdx].emoji} ${PETS[save.petIdx].name}</div>
+      <div class="spacer"></div>
+      <button class="btn-round" id="btnSound">${save.sound ? '🔊' : '🔇'}</button>
+      <button class="btn-round" id="btnReset">↺</button>`;
+    document.getElementById('btnSound').onclick = () => {
+      save.sound = !save.sound; persist(); sfxTap(); renderHUD('home');
+      if (save.sound) speak('声音打开啦');
+    };
+    document.getElementById('btnReset').onclick = () => {
+      if (confirm('要把所有星星和进度清零，重新开始吗？')) {
+        save = defaultSave(); persist(); renderHUD('home'); renderHome();
+      }
+    };
+  } else {
+    hudEl.innerHTML = `
+      <button class="btn-round" id="btnBack">←</button>
+      <div class="chip">${state.level.icon} 第${state.level.id}关</div>
+      <div class="chip" id="chipProg">${state.qIndex+1}/${state.level.total}</div>
+      <div class="spacer"></div>
+      ${state.level.time ? `<div class="chip" id="chipTime">⏱ ${state.timeLeft}s</div>` : ''}
+      <div class="chip star">⭐ ${save.totalStars}</div>`;
+    document.getElementById('btnBack').onclick = () => { sfxTap(); goHome(); };
+  }
+}
+
+// ---------- 主页 ----------
+function renderHome() {
+  renderHUD('home');
+  const pet = PETS[save.petIdx];
+  const next = PETS[save.petIdx + 1];
+  let pct = 100, tip = '已经养到最终形态啦！';
+  if (next) {
+    const cur = pet.need, tgt = next.need;
+    pct = Math.max(0, Math.min(100, Math.round((save.totalStars - cur) / (tgt - cur) * 100)));
+    tip = `再攒 ${Math.max(0, tgt - save.totalStars)} 颗星，解锁 ${next.emoji} ${next.name}`;
+  }
+
+  let modesHTML = '';
+  LEVELS.forEach((lv, i) => {
+    const st = save.stars[lv.id] || 0;
+    const prevSt = i === 0 ? 3 : (save.stars[LEVELS[i-1].id] || 0);
+    const locked = i > 0 && prevSt === 0;   // 上一关没拿到星则未解锁（拿到至少1星即解锁）
+    const starsShow = '⭐'.repeat(st) + '☆'.repeat(3 - st);
+    modesHTML += `
+      <button class="mode ${locked ? 'locked' : ''}" data-lv="${lv.id}" ${locked ? 'disabled' : ''}>
+        <span class="ico">${locked ? '🔒' : lv.icon}</span>
+        <span class="txt">
+          <span class="t1">第${lv.id}关 ${lv.name}</span>
+          <span class="t2">${lv.desc} ｜ ${starsShow}</span>
+        </span>
+        <span class="arrow">▶</span>
+      </button>`;
+  });
+
+  stageEl.innerHTML = `
+    <div class="home">
+      <div>
+        <div class="logo">数学小闯关</div>
+        <div class="logo-sub">一年级 · 20 以内加减法</div>
+      </div>
+      <div class="pet-card">
+        <div class="pet-stage" id="petStage">${pet.emoji}</div>
+        <div class="pet-name">我的伙伴：${pet.name}</div>
+        <div class="pet-bar-wrap"><div class="pet-bar" style="width:${pct}%"></div></div>
+        <div class="pet-tip">${tip}</div>
+      </div>
+      <div class="mode-list">${modesHTML}</div>
+      <div style="height:6px"></div>
+    </div>`;
+
+  stageEl.querySelectorAll('.mode').forEach(btn => {
+    btn.onclick = () => {
+      if (btn.disabled) { sfxWrong(); speak('先通过上一关哦'); return; }
+      sfxTap();
+      startLevel(parseInt(btn.dataset.lv, 10));
+    };
+  });
+}
+
+// ---------- 开始关卡 ----------
+function startLevel(lvId) {
+  const level = LEVELS.find(l => l.id === lvId);
+  state = {
+    level, qIndex:0, correct:0, wrong:0, combo:0, maxCombo:0,
+    q:null, options:[], answered:false, locked:false,
+    timeLeft: level.time, timerId:null, startTs: Date.now()
+  };
+  renderHUD('play');
+  if (level.time) startTimer();
+  nextQuestion();
+}
+
+function startTimer() {
+  clearInterval(state.timerId);
+  state.timerId = setInterval(() => {
+    if (!state || !state.level.time) return;
+    state.timeLeft--;
+    const el = document.getElementById('chipTime');
+    if (el) el.textContent = `⏱ ${state.timeLeft}s`;
+    if (state.timeLeft <= 5 && state.timeLeft > 0) tone(660, 0, .1, 'sine', .12);
+    if (state.timeLeft <= 0) { clearInterval(state.timerId); endLevel(true); }
+  }, 1000);
+}
+
+// ---------- 出下一题 ----------
+function nextQuestion() {
+  if (state.qIndex >= state.level.total) { endLevel(false); return; }
+  state.q = makeQuestion(state.level.type);
+  state.options = makeOptions(state.q.ans);
+  state.answered = false; state.locked = false;
+  renderHUD('play');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = state.q, lv = state.level;
+  const pct = Math.round(state.qIndex / lv.total * 100);
+  const comboHTML = state.combo >= 3 ? `<div class="stars-row" style="color:#FF5C8A">🔥 连对 ${state.combo} 题！</div>` : '<div class="stars-row"></div>';
+
+  let answerArea = '';
+  if (q.isMissing) {
+    // 填空：用数字键盘
+    answerArea = `
+      <div class="options" style="grid-template-columns:1fr;max-width:420px">
+        <div class="opt" id="typeBox" style="font-size:38px;color:#FF8A3D">?</div>
+      </div>
+      <div class="keypad" id="keypad"></div>`;
+  } else {
+    answerArea = `<div class="options" id="options"></div>`;
+  }
+
+  stageEl.innerHTML = `
+    <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+    <div class="quiz">
+      ${comboHTML}
+      <div class="expr">${q.isMissing ? q.text : q.text.replace('?', '<span class="ans-box" id="ansBox">?</span>')}</div>
+    </div>
+    ${answerArea}`;
+
+  if (q.isMissing) {
+    buildKeypad();
+  } else {
+    const wrap = document.getElementById('options');
+    state.options.forEach(v => {
+      const b = document.createElement('button');
+      b.className = 'opt'; b.textContent = v; b.dataset.v = v;
+      b.onclick = (e) => onAnswer(v, e.currentTarget);
+      wrap.appendChild(b);
+    });
+  }
+}
+
+// 填空模式：数字键盘
+let typed = '';
+function buildKeypad() {
+  typed = '';
+  const kp = document.getElementById('keypad');
+  const keys = ['1','2','3','4','5','6','7','8','9','⌫','0','✓'];
+  keys.forEach(k => {
+    const b = document.createElement('button');
+    b.className = 'key' + (k === '⌫' || k === '✓' ? ' fn' : '');
+    b.textContent = k;
+    b.onclick = () => {
+      if (state.locked) return;
+      sfxTap();
+      if (k === '⌫') { typed = typed.slice(0, -1); }
+      else if (k === '✓') { submitTyped(); return; }
+      else { if (typed.length < 2) typed += k; }
+      const box = document.getElementById('ansBox');
+      if (box) box.textContent = typed || '?';
+    };
+    kp.appendChild(b);
+  });
+}
+function submitTyped() {
+  if (typed === '') { speak('先输入答案哦'); return; }
+  onAnswer(parseInt(typed, 10), null);
+}
+
+// ---------- 答题判定 ----------
+function onAnswer(val, btnEl) {
+  if (state.locked || state.answered) return;
+  state.answered = true;
+
+  const correct = (val === state.q.ans);
+
+  if (state.level.time) {
+    // 计时模式不锁死，答错可继续尝试但记一次错
+  }
+
+  if (correct) {
+    state.locked = true;
+    state.correct++;
+    state.combo++;
+    state.maxCombo = Math.max(state.maxCombo, state.combo);
+    sfxCorrect();
+    if (state.combo >= 3) speak(PRAISE[Math.floor(Math.random()*PRAISE.length)]);
+    else praise();
+    floatText(['+1 ⭐','真棒','对了','👍'][rnd(0,3)]);
+    if (btnEl) btnEl.classList.add('correct');
+    burstConfetti(state.combo >= 3 ? 16 : 8);
+    // 连对奖励星星
+    if (state.combo > 0 && state.combo % 3 === 0) {
+      floatText('连对奖励 +2⭐', '#FF5C8A');
+      save.totalStars += 2; persist();
+    }
+    setTimeout(() => {
+      state.qIndex++;
+      nextQuestion();
+    }, correct ? 780 : 400);
+  } else {
+    state.wrong++;
+    state.combo = 0;
+    sfxWrong();
+    encourage();
+    if (btnEl) {
+      btnEl.classList.add('wrong');
+      setTimeout(() => btnEl.classList.add('dim'), 500);
+      btnEl.disabled = true;
+    } else {
+      typed = '';
+      const box = document.getElementById('ansBox');
+      if (box) box.textContent = '?';
+    }
+    // 计时模式：答错扣时间
+    if (state.level.time) {
+      state.timeLeft = Math.max(1, state.timeLeft - 2);
+    } else {
+      // 非计时模式：答错后允许重试，把错误选项标记，继续作答
+      state.answered = false;
+      state.locked = false;
+    }
+  }
+}
+
+// ---------- 结算 ----------
+function endLevel(timeUp) {
+  clearInterval(state.timerId);
+  const lv = state.level;
+  const total = timeUp ? Math.max(state.qIndex, 1) : lv.total;
+  const acc = total > 0 ? state.correct / lv.total : 0;
+
+  let stars = 0;
+  if (acc >= 1) stars = 3;
+  else if (acc >= 0.8) stars = 2;
+  else if (acc >= 0.6) stars = 1;
+
+  const prevStars = save.stars[lv.id] || 0;
+  let gained = state.correct;          // 每答对一题 1 颗星
+  if (stars > prevStars) {
+    save.stars[lv.id] = stars;
+    gained += stars * 2;               // 评星额外奖励
+  }
+  save.totalStars += gained;
+
+  // 记录最好成绩
+  const key = 'lv' + lv.id;
+  if (!save.best[key] || state.correct > save.best[key]) save.best[key] = state.correct;
+
+  // 小动物养成：累计喂养值
+  let newPetUnlocked = null;
+  save.petFed += state.correct;
+  let idx = 0;
+  for (let i = 0; i < PETS.length; i++) { if (save.totalStars >= PETS[i].need) idx = i; }
+  if (idx > save.petIdx) {
+    newPetUnlocked = PETS[idx];
+    save.petIdx = idx;
+    save.petFed = 0;
+  }
+  persist();
+
+  const starShow = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+  const msgs = ['再练一练就更棒啦！','进步很大，继续加油！','很好了！离满星不远啦','太厉害了，完美通关！'];
+  const msg = stars === 3 ? msgs[3] : msgs[Math.min(stars, 2)];
+
+  renderHUD('home');
+  stageEl.innerHTML = `
+    <div class="home">
+      <div class="result">
+        <div class="lbl">${timeUp ? '时间到啦！' : '本关完成'}</div>
+        <div class="got-stars">${starShow}</div>
+        <div class="big">${state.correct} / ${lv.total}</div>
+        <div class="msg">${msg}</div>
+        <div style="font-size:16px;font-weight:800;color:#8A6A3D;margin-bottom:14px">
+          本次获得 <span style="color:#F5A623">${gained}</span> 颗星 ｜ 累计 <span style="color:#F5A623">${save.totalStars}</span> ⭐
+          ${state.maxCombo >= 3 ? `<br>最高连对 ${state.maxCombo} 题 🔥` : ''}
+        </div>
+        ${newPetUnlocked ? `<div class="newpet">🎉 解锁新伙伴：${newPetUnlocked.emoji} ${newPetUnlocked.name}！</div>` : ''}
+        <div style="font-size:46px;margin:6px 0 16px">${PETS[save.petIdx].emoji}</div>
+        <div class="btn-row">
+          <button class="btn-main" id="btnAgain">再来一次</button>
+          <button class="btn-ghost" id="btnNext">下一关</button>
+          <button class="btn-ghost" id="btnHome">回主页</button>
+        </div>
+      </div>
+    </div>`;
+
+  if (stars === 3) { sfxWin(); speak('太厉害啦，满星通关'); }
+  else if (stars >= 1) { speak(msg.replace(/[！!]/g,'')); }
+  else { speak('没关系，我们再来一次'); }
+
+  document.getElementById('btnAgain').onclick = () => { sfxTap(); startLevel(lv.id); };
+  document.getElementById('btnHome').onclick = () => { sfxTap(); goHome(); };
+  const nextLv = LEVELS.find(l => l.id === lv.id + 1);
+  const btnNext = document.getElementById('btnNext');
+  if (nextLv && stars >= 1) {
+    btnNext.onclick = () => { sfxTap(); startLevel(nextLv.id); };
+  } else {
+    btnNext.style.display = 'none';
+  }
+}
+
+function goHome() {
+  clearInterval(state && state.timerId);
+  state = null;
+  renderHome();
+}
+
+// ---------- 特效 ----------
+function floatText(txt, color) {
+  const d = document.createElement('div');
+  d.className = 'float-txt';
+  d.textContent = txt;
+  d.style.color = color || '#FF8A3D';
+  d.style.left = (window.innerWidth / 2) + 'px';
+  d.style.top = (window.innerHeight * 0.42) + 'px';
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 950);
+}
+function burstConfetti(n) {
+  const colors = ['#FFC93B','#FF8A3D','#FF5C8A','#7ED957','#4FC3F7','#B388FF'];
+  for (let i = 0; i < n; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = rnd(5, 95) + 'vw';
+    c.style.top = '-20px';
+    c.style.background = colors[rnd(0, colors.length - 1)];
+    c.style.animationDelay = (Math.random() * .3) + 's';
+    c.style.animationDuration = (1.3 + Math.random() * .8) + 's';
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 2400);
+  }
+}
+
+// ---------- 启动 ----------
+// 首次进入给一句欢迎
+window.addEventListener('load', () => {
+  renderHome();
+  setTimeout(() => { if (save.sound) speak('欢迎来到数学小闯关'); }, 600);
+});
+// 触摸时激活音频上下文（浏览器策略要求用户手势）
+document.addEventListener('touchstart', () => { ac(); }, { once: true });
+document.addEventListener('click', () => { ac(); }, { once: true });
+</script>
+</body>
+</html>
